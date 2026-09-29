@@ -1,8 +1,8 @@
 @echo off
 chcp 65001 >nul
-title One-Punch Man: Географический Герой
+title One Piece: География Великого Моря
 echo Запуск игры...
-python "OnePunch_Geography_Game.py"
+python "OnePiece_Geography_Game.py"
 if errorlevel 1 (
     echo.
     echo ========================================
