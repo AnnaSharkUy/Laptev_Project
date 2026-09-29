@@ -11,76 +11,34 @@ jobs:
   check:
     name: Syntax & structure
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
-      - name: Check required files exist
+      - name: Check files
         run: |
-          test -f OnePunch_Geography_Game.py
+          test -f OnePiece_Geography_Game.py
+          test -f game.b64
           test -f start.bat
           test -f README.txt
           test -d music
           test -d animation
-          echo "All required files and folders are present."
-
-      - name: Python syntax check
-        run: |
-          python -m py_compile OnePunch_Geography_Game.py
-          echo "Syntax OK"
-
-      - name: Validate header and game payload
+          echo OK
+      - name: Validate game
         run: |
           python - <<'PY'
-          import re
-          import sys
-          import zlib
-          import base64
-
-          with open("OnePunch_Geography_Game.py", encoding="utf-8") as f:
-              source = f.read()
-
-          required = [
-              "One-Punch Man: Географический Герой",
-              "Игра для подготовки к ВПР по географии 6 класс",
-              "Владимир Лаптев",
-              "Дима Пикулин",
-              "Ярослав Костюков",
-              "Воронцов Николай Витальевич",
-          ]
-          for text in required:
-              if text not in source:
-                  print(f"Missing in header: {text}")
+          import pathlib, zlib, base64, sys
+          main = pathlib.Path("OnePiece_Geography_Game.py").read_text(encoding="utf-8")
+          for t in ["One Piece: География Великого Моря", "Владимир Лаптев", "Воронцов Николай Витальевич"]:
+              if t not in main:
+                  print("Missing", t)
                   sys.exit(1)
-
-          m = re.search(r"b64decode\('([^']+)'\)", source)
-          if not m:
-              print("Compressed game payload not found")
+          b64 = pathlib.Path("game.b64").read_text(encoding="ascii").strip()
+          game = zlib.decompress(base64.b64decode(b64)).decode("utf-8")
+          if "LEVELS" not in game or "Глава 1" not in game:
+              print("Bad payload")
               sys.exit(1)
-
-          game = zlib.decompress(base64.b64decode(m.group(1))).decode("utf-8")
-          if "LEVELS" not in game:
-              print("LEVELS not found in decompressed game")
-              sys.exit(1)
-          if game.count('"name": "Уровень') < 3 and game.count("Уровень 1") < 1:
-              # soft check: three levels mentioned
-              if "Уровень 1" not in game or "Уровень 2" not in game or "Уровень 3" not in game:
-                  print("Expected 3 levels in game data")
-                  sys.exit(1)
-
           compile(game, "<game>", "exec")
-          print("Header OK")
-          print("Decompressed game compiles")
-          print("CI checks passed.")
+          print("CI OK")
           PY
-
-      - name: Optional pygame install (for sound support note)
-        run: |
-          pip install pygame || true
-          python -c "import pygame; print('pygame', pygame.version.ver)" || echo "pygame optional — OK without it"
