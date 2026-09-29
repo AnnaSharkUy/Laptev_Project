@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: Syntax & structure
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check required files exist
+        run: |
+          test -f OnePunch_Geography_Game.py
+          test -f start.bat
+          test -f README.txt
+          test -d music
+          test -d animation
+          echo "All required files and folders are present."
+
+      - name: Python syntax check
+        run: |
+          python -m py_compile OnePunch_Geography_Game.py
+          echo "Syntax OK"
+
+      - name: Validate game data structure
+        run: |
+          python - <<'PY'
+          import ast
+          import sys
+
+          with open("OnePunch_Geography_Game.py", encoding="utf-8") as f:
+              source = f.read()
+
+          tree = ast.parse(source)
+
+          # Ищем LEVELS в AST
+          levels = None
+          for node in tree.body:
+              if isinstance(node, ast.Assign):
+                  for target in node.targets:
+                      if isinstance(target, ast.Name) and target.id == "LEVELS":
+                          # Простая проверка: LEVELS должен быть списком
+                          if not isinstance(node.value, ast.List):
+                              print("LEVELS is not a list")
+                              sys.exit(1)
+                          levels = node.value
+                          break
+
+          if levels is None:
+              print("LEVELS not found in the game file")
+              sys.exit(1)
+
+          if len(levels.elts) != 3:
+              print(f"Expected 3 levels, found {len(levels.elts)}")
+              sys.exit(1)
+
+          print("LEVELS structure OK: 3 levels found")
+          print("CI checks passed.")
+          PY
+
+      - name: Optional pygame install (for sound support note)
+        run: |
+          pip install pygame || true
+          python -c "import pygame; print('pygame', pygame.version.ver)" || echo "pygame optional — OK without it"
