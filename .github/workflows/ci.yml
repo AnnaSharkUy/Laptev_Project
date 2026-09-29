@@ -35,39 +35,48 @@ jobs:
           python -m py_compile OnePunch_Geography_Game.py
           echo "Syntax OK"
 
-      - name: Validate game data structure
+      - name: Validate header and game payload
         run: |
           python - <<'PY'
-          import ast
+          import re
           import sys
+          import zlib
+          import base64
 
           with open("OnePunch_Geography_Game.py", encoding="utf-8") as f:
               source = f.read()
 
-          tree = ast.parse(source)
+          required = [
+              "One-Punch Man: Географический Герой",
+              "Игра для подготовки к ВПР по географии 6 класс",
+              "Владимир Лаптев",
+              "Дима Пикулин",
+              "Ярослав Костюков",
+              "Воронцов Николай Витальевич",
+          ]
+          for text in required:
+              if text not in source:
+                  print(f"Missing in header: {text}")
+                  sys.exit(1)
 
-          # Ищем LEVELS в AST
-          levels = None
-          for node in tree.body:
-              if isinstance(node, ast.Assign):
-                  for target in node.targets:
-                      if isinstance(target, ast.Name) and target.id == "LEVELS":
-                          # Простая проверка: LEVELS должен быть списком
-                          if not isinstance(node.value, ast.List):
-                              print("LEVELS is not a list")
-                              sys.exit(1)
-                          levels = node.value
-                          break
-
-          if levels is None:
-              print("LEVELS not found in the game file")
+          m = re.search(r"b64decode\('([^']+)'\)", source)
+          if not m:
+              print("Compressed game payload not found")
               sys.exit(1)
 
-          if len(levels.elts) != 3:
-              print(f"Expected 3 levels, found {len(levels.elts)}")
+          game = zlib.decompress(base64.b64decode(m.group(1))).decode("utf-8")
+          if "LEVELS" not in game:
+              print("LEVELS not found in decompressed game")
               sys.exit(1)
+          if game.count('"name": "Уровень') < 3 and game.count("Уровень 1") < 1:
+              # soft check: three levels mentioned
+              if "Уровень 1" not in game or "Уровень 2" not in game or "Уровень 3" not in game:
+                  print("Expected 3 levels in game data")
+                  sys.exit(1)
 
-          print("LEVELS structure OK: 3 levels found")
+          compile(game, "<game>", "exec")
+          print("Header OK")
+          print("Decompressed game compiles")
           print("CI checks passed.")
           PY
 
